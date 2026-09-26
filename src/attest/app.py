@@ -10,7 +10,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DBAPIError, OperationalError
 
 from src.attest.api.router import router as actions_router
+from src.attest.clients import create_downstream_client, create_verifier_client
 from src.attest.config import settings
+from src.attest.contracts import ContractRegistry, load_contracts
 
 logging.basicConfig(
     level=settings.log_level,
@@ -23,7 +25,25 @@ logger = logging.getLogger("attest.gateway")
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan context for startup and shutdown procedures."""
     logger.info("Starting Attest Gateway Service...")
+
+    # Fail-fast contract loading on startup
+    try:
+        contracts_dict = load_contracts("contracts")
+        app.state.contract_registry = ContractRegistry(contracts_dict)
+        logger.info(f"Loaded {len(contracts_dict)} contracts: {list(contracts_dict.keys())}")
+    except Exception as exc:
+        logger.critical(f"Failed to load contracts on startup: {exc}")
+        raise
+
+    # Initialize shared HTTP clients
+    app.state.downstream_client = create_downstream_client()
+    app.state.verifier_client = create_verifier_client()
+
     yield
+
+    # Teardown HTTP clients
+    await app.state.downstream_client.aclose()
+    await app.state.verifier_client.aclose()
     logger.info("Shutting down Attest Gateway Service...")
 
 

@@ -19,8 +19,8 @@ async def test_get_action_with_events_integration(gateway_client: AsyncClient) -
         "task_id": task_id,
         "step": 1,
         "tool": "issue_refund",
-        "resource_key": "order-get-e2e",
-        "args": {"order_id": "order-get-e2e", "amount": 80.0},
+        "resource_key": "order-12345",
+        "args": {"order_id": "order-12345", "amount": 80.0},
     }
 
     create_resp = await gateway_client.post("/v1/actions", json=payload)
@@ -31,10 +31,12 @@ async def test_get_action_with_events_integration(gateway_client: AsyncClient) -
     assert get_resp.status_code == 200
     data = get_resp.json()
     assert data["action_id"] == action_id
-    assert data["state"] == "RECEIVED"
-    assert len(data["events"]) == 1
+    assert data["state"] == "VERIFIED"
+    assert data["verdict"] == "VERIFIED"
+    assert len(data["events"]) == 3
     assert data["events"][0]["to_state"] == "RECEIVED"
-    assert data["events"][0]["from_state"] is None
+    assert data["events"][1]["to_state"] == "EXECUTED"
+    assert data["events"][2]["to_state"] == "VERIFIED"
 
 
 @pytest.mark.asyncio

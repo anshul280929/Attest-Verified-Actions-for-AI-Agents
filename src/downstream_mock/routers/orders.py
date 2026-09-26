@@ -28,6 +28,12 @@ async def get_order(order_id: str) -> dict[str, Any]:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Order {order_id} not found",
         )
+    order_refunds = [r for r in store.refunds.values() if r.order_id == order_id]
+    refund_summary = {
+        "status": "processed" if order.refunded_amount > 0 else "none",
+        "amount": order.refunded_amount,
+        "count": len(order_refunds),
+    }
     return {
         "order_id": order.order_id,
         "customer_id": order.customer_id,
@@ -36,6 +42,16 @@ async def get_order(order_id: str) -> dict[str, Any]:
         "refunded_amount": order.refunded_amount,
         "items": order.items,
         "created_at": order.created_at,
+        "refund": refund_summary,
+        "refunds": [
+            {
+                "refund_id": r.refund_id,
+                "amount": r.amount,
+                "reason": r.reason,
+                "created_at": r.created_at,
+            }
+            for r in order_refunds
+        ],
     }
 
 

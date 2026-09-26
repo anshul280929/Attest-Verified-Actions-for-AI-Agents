@@ -78,14 +78,35 @@ async def integration_session(
 @pytest_asyncio.fixture(scope="function")
 async def gateway_client(integration_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """HTTP client talking to the Attest gateway with integration DB."""
+    from src.attest.api.dependencies import (
+        get_contract_registry,
+        get_downstream_client,
+        get_verifier_client,
+    )
+    from src.attest.contracts import ContractRegistry, load_contracts
+    from src.downstream_mock.store import store
+
+    store.reset()
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield integration_session
 
+    contracts = load_contracts("contracts")
+    registry = ContractRegistry(contracts)
+
+    mock_transport = ASGITransport(app=mock_app)
+    mock_client = AsyncClient(transport=mock_transport, base_url="http://mock.downstream.local")
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_contract_registry] = lambda: registry
+    app.dependency_overrides[get_downstream_client] = lambda: mock_client
+    app.dependency_overrides[get_verifier_client] = lambda: mock_client
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://gateway.attest.local") as client:
         yield client
+
+    await mock_client.aclose()
     app.dependency_overrides.clear()
 
 

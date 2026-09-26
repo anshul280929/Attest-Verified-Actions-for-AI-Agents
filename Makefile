@@ -9,7 +9,10 @@ down:
 migrate:
 	alembic upgrade head
 
-test:
+validate-contracts:
+	python -c "from src.attest.contracts import load_contracts; load_contracts('contracts'); print('All contracts valid.')"
+
+test: validate-contracts
 	pytest tests/ -v --tb=short
 
 test-unit:

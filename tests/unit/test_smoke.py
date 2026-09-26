@@ -28,8 +28,8 @@ async def test_post_action_tracer_slice(client: AsyncClient) -> None:
 
     data = response.json()
     assert "action_id" in data
-    assert data["state"] == "RECEIVED"
-    assert data["verdict"] is None
+    assert data["state"] == "VERIFIED"
+    assert data["verdict"] == "VERIFIED"
     assert data["deduplicated"] is False
-    assert data["message"] == "action recorded"
+    assert data["message"] == "action verified"
     assert len(data["idempotency_key"]) == 64

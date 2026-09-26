@@ -24,8 +24,8 @@ async def test_get_action_endpoint(client: AsyncClient) -> None:
         "task_id": "task-api-1",
         "step": 1,
         "tool": "issue_refund",
-        "resource_key": "order-get-1",
-        "args": {"order_id": "order-get-1", "amount": 20.0},
+        "resource_key": "order-12345",
+        "args": {"order_id": "order-12345", "amount": 20.0},
     }
     create_resp = await client.post("/v1/actions", json=payload)
     assert create_resp.status_code == 200
@@ -36,10 +36,13 @@ async def test_get_action_endpoint(client: AsyncClient) -> None:
     data = get_resp.json()
     assert data["action_id"] == action_id
     assert data["tool"] == "issue_refund"
-    assert data["resource_key"] == "order-get-1"
-    assert data["state"] == "RECEIVED"
-    assert len(data["events"]) == 1
+    assert data["resource_key"] == "order-12345"
+    assert data["state"] == "VERIFIED"
+    assert data["verdict"] == "VERIFIED"
+    assert len(data["events"]) == 3
     assert data["events"][0]["to_state"] == "RECEIVED"
+    assert data["events"][1]["to_state"] == "EXECUTED"
+    assert data["events"][2]["to_state"] == "VERIFIED"
 
 
 @pytest.mark.asyncio

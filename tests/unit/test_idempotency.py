@@ -75,8 +75,8 @@ async def test_api_deduplication(client: AsyncClient) -> None:
         "task_id": "task-dedup-100",
         "step": 1,
         "tool": "cancel_order",
-        "resource_key": "order-dedup-1",
-        "args": {"order_id": "order-dedup-1", "reason": "user_cancelled"},
+        "resource_key": "order-67890",
+        "args": {"order_id": "order-67890", "reason": "user_cancelled"},
     }
 
     # First submission
@@ -85,6 +85,7 @@ async def test_api_deduplication(client: AsyncClient) -> None:
     data1 = resp1.json()
     assert data1["deduplicated"] is False
     action_id_1 = data1["action_id"]
+    assert data1["state"] == "VERIFIED"
 
     # Second submission (identical)
     resp2 = await client.post("/v1/actions", json=payload)
@@ -93,10 +94,13 @@ async def test_api_deduplication(client: AsyncClient) -> None:
     assert data2["deduplicated"] is True
     assert data2["action_id"] == action_id_1
     assert data2["idempotency_key"] == data1["idempotency_key"]
+    assert data2["state"] == "VERIFIED"
 
-    # Verify action details and audit trail: only 1 initial event exists
+    # Verify action details and audit trail: exactly 1 execution lifecycle occurred
     detail_resp = await client.get(f"/v1/actions/{action_id_1}")
     assert detail_resp.status_code == 200
     detail_data = detail_resp.json()
-    assert len(detail_data["events"]) == 1
+    assert len(detail_data["events"]) == 3
     assert detail_data["events"][0]["to_state"] == "RECEIVED"
+    assert detail_data["events"][1]["to_state"] == "EXECUTED"
+    assert detail_data["events"][2]["to_state"] == "VERIFIED"

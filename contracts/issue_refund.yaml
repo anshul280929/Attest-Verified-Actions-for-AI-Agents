@@ -1,0 +1,20 @@
+name: issue_refund
+resource_key: "{args.order_id}"
+downstream:
+  method: POST
+  path: /refunds
+  idempotency_header: Idempotency-Key
+  timeout_ms: 2000
+  definite_failure_statuses: [400, 402, 404, 409, 422]
+postcondition:
+  read: GET /orders/{args.order_id}
+  assert:
+    - "body.refund.status == 'processed'"
+    - "body.refund.amount == args.amount"
+    - "body.refund.count == 1"
+compensation:
+  method: POST
+  path: /refunds/{downstream_ref}/reverse
+reconcile:
+  backoff_seconds: [1, 2, 4, 8, 16]
+  deadline_seconds: 60

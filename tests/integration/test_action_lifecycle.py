@@ -13,6 +13,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.attest.models.action import Action, ActionEvent
 from src.attest.repository import ActionRepository
@@ -29,8 +30,8 @@ async def test_durable_recording_before_execution(
         "task_id": task_id,
         "step": 1,
         "tool": "issue_refund",
-        "resource_key": "order-durable-1",
-        "args": {"order_id": "order-durable-1", "amount": 55.0},
+        "resource_key": "order-12345",
+        "args": {"order_id": "order-12345", "amount": 55.0},
     }
 
     resp = await gateway_client.post("/v1/actions", json=payload)
@@ -38,14 +39,18 @@ async def test_durable_recording_before_execution(
     action_id = uuid.UUID(resp.json()["action_id"])
 
     # Directly inspect database row outside gateway
-    stmt = select(Action).where(Action.id == action_id)
+    stmt = select(Action).where(Action.id == action_id).options(selectinload(Action.events))
     result = await integration_session.execute(stmt)
     action_row = result.scalar_one_or_none()
 
     assert action_row is not None
     assert action_row.task_id == task_id
-    assert action_row.state == ActionState.RECEIVED.value
+    assert action_row.state == ActionState.VERIFIED.value
     assert action_row.tool == "issue_refund"
+    assert len(action_row.events) == 3
+    assert action_row.events[0].to_state == ActionState.RECEIVED.value
+    assert action_row.events[1].to_state == ActionState.EXECUTED.value
+    assert action_row.events[2].to_state == ActionState.VERIFIED.value
 
 
 @pytest.mark.asyncio
